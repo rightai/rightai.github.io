@@ -164,18 +164,23 @@
                 const mimeType = part?.inlineData?.mimeType;
 
                 if (audioData && mimeType && mimeType.startsWith("audio/")) {
-                    const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)[1], 10);
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    const pcm16 = new Int16Array(pcmData);
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const matchResult = mimeType.match(/rate=(\d+)/);
+                    if (matchResult && matchResult[1]) {
+                        const sampleRate = parseInt(matchResult[1], 10);
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        const audioUrl = URL.createObjectURL(wavBlob);
 
-                    const audio = new Audio(audioUrl);
-                    audio.onended = () => {
-                        setIsSpeaking(false);
-                        setTimeout(() => setCurrentAnswer(''), 3000);
-                    };
-                    audio.play();
+                        const audio = new Audio(audioUrl);
+                        audio.onended = () => {
+                            setIsSpeaking(false);
+                            setTimeout(() => setCurrentAnswer(''), 3000);
+                        };
+                        audio.play();
+                    } else {
+                        throw new Error('Could not parse sample rate from audio mimeType.');
+                    }
                 } else {
                     throw new Error('Invalid audio data from API');
                 }
