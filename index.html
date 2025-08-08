@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Right AI Robot</title>
+    <!-- Inter font from Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap">
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React and ReactDOM from CDN -->
@@ -12,14 +14,10 @@
     <!-- Babel for JSX compilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      @keyframes fade-out {
-          0% { opacity: 1; transform: translateY(0); }
-          80% { opacity: 1; transform: translateY(0); }
-          100% { opacity: 0; transform: translateY(-20px); }
-      }
-      .animate-fade-out {
-          animation: fade-out 3s forwards;
-      }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* The fade-out animation has been removed to keep the caption persistent. */
     </style>
 </head>
 <body class="bg-gray-950 text-white">
@@ -40,15 +38,19 @@
         const [isListening, setIsListening] = useState(false);
         // State to control the AI speaking animation.
         const [isSpeaking, setIsSpeaking] = useState(false);
-        // State to show a loading indicator.
+        // State to show a general loading indicator.
         const [isLoading, setIsLoading] = useState(false);
+        // State to show a loading indicator for text generation.
+        const [isGeneratingText, setIsGeneratingText] = useState(false);
+        // State to show a loading indicator for audio generation.
+        const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
         // State for chat history visibility.
         const [showChatHistory, setShowChatHistory] = useState(false);
         // State for fun fact generation mode.
         const [isGeneratingFact, setIsGeneratingFact] = useState(false);
         // State to select the AI's voice.
         const [voiceName, setVoiceName] = useState("Kore");
-        // Ref to manage the file input element.
+        // Ref to manage the file input element for image uploads.
         const fileInputRef = useRef(null);
         // Ref to the chat history container for auto-scrolling.
         const chatHistoryRef = useRef(null);
@@ -56,6 +58,7 @@
         const recognitionRef = useRef(null);
 
         // Effect hook for auto-scrolling chat history.
+        // It triggers whenever the chatHistory state changes.
         useEffect(() => {
             if (chatHistoryRef.current) {
                 chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
@@ -137,8 +140,7 @@
         // Function to handle Text-to-Speech using the Gemini API.
         const handleSpeak = async (text) => {
             setIsSpeaking(true);
-            // Do not set currentAnswer here, as it will be set later to sync with the chat history.
-
+            setIsGeneratingAudio(true);
             try {
                 const payload = {
                     contents: [{ parts: [{ text: `Say cheerfully: ${text}` }] }],
@@ -175,7 +177,8 @@
                         const audio = new Audio(audioUrl);
                         audio.onended = () => {
                             setIsSpeaking(false);
-                            setTimeout(() => setCurrentAnswer(''), 3000);
+                            setIsGeneratingAudio(false);
+                            // The answer now persists, so no need to clear it here.
                         };
                         audio.play();
                     } else {
@@ -187,8 +190,8 @@
             } catch (error) {
                 console.error('Error with Gemini TTS API:', error);
                 setIsSpeaking(false);
+                setIsGeneratingAudio(false);
                 setCurrentAnswer("I'm sorry, I'm having trouble speaking right now.");
-                setTimeout(() => setCurrentAnswer(''), 3000);
             }
         };
         
@@ -226,7 +229,6 @@
                 setCurrentAnswer('');
             };
             
-            // This event fires as speech is detected, providing both final and interim results.
             recognition.onresult = (event) => {
                 let interimTranscript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -240,11 +242,12 @@
                 setCurrentQuestion(finalTranscript + interimTranscript);
             };
 
-            // This event fires when speech recognition stops.
             recognition.onend = () => {
                 setIsListening(false);
                 const promptToProcess = finalTranscript.trim();
                 if (promptToProcess) {
+                    // Update currentQuestion one last time with the final, corrected text
+                    setCurrentQuestion(promptToProcess);
                     // If a final transcript was captured, process it
                     if (isGeneratingFact) {
                         generateFunFact(promptToProcess);
@@ -252,8 +255,8 @@
                         handleUserPrompt(promptToProcess);
                     }
                 } else {
-                    // If no transcript was captured, clear the display after a delay
-                    setTimeout(() => setCurrentQuestion(''), 1000);
+                    // If no transcript was captured, clear the display
+                    setCurrentQuestion('');
                 }
             };
 
@@ -261,24 +264,24 @@
                 console.error('Speech recognition error:', event.error);
                 setIsListening(false);
                 setIsGeneratingFact(false);
-                setTimeout(() => setCurrentQuestion(''), 3000);
+                setCurrentQuestion('');
             };
             
             recognition.start();
         };
 
-        // Function to initiate the fun fact generation process.
+        // Function to initiate the fun fact generation process by starting to listen.
         const handleGenerateFunFactButton = () => {
             setIsGeneratingFact(true);
             handleListen();
         };
 
-        // Function to initiate image description.
+        // Function to initiate image description by triggering the hidden file input.
         const handleDescribeImageButton = () => {
             fileInputRef.current.click();
         };
         
-        // Function to handle file selection from the input.
+        // Handles file selection and initiates the image description process.
         const handleFileChange = (event) => {
             const file = event.target.files[0];
             if (file) {
@@ -295,6 +298,7 @@
         const generateFunFact = async (topic) => {
             setIsGeneratingFact(false);
             setIsLoading(true);
+            setIsGeneratingText(true);
             try {
                 const prompt = `Generate a very short, interesting, and easy-to-understand fun fact for a school science fair about the topic: "${topic}". The fact should be no more than two sentences.`;
                 const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }] };
@@ -309,17 +313,21 @@
 
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a fun fact for that topic.";
                 
-                // Initiate voice response first
+                setIsGeneratingText(false);
+                
+                // Add the user's prompt and AI's response to the chat history
+                setChatHistory(prev => [...prev, { role: 'user', text: `Fun fact about: ${topic}` }, { role: 'ai', text: text }]);
+                
+                // Display the answer and then speak it.
+                setCurrentAnswer(text);
                 handleSpeak(text);
                 
-                // Update chat history and display after
-                setCurrentAnswer(text);
-                setChatHistory(prev => [...prev, { role: 'user', text: `Fun fact about: ${topic}` }, { role: 'ai', text: text }]);
             } catch (error) {
                 console.error('Error fetching from Gemini API:', error);
                 const errorMessage = "I'm sorry, I encountered an error while trying to generate a fun fact. Please try again.";
-                handleSpeak(errorMessage);
                 setChatHistory(prev => [...prev, { role: 'user', text: `Fun fact about: ${topic}` }, { role: 'ai', text: errorMessage }]);
+                setCurrentAnswer(errorMessage);
+                handleSpeak(errorMessage);
             } finally {
                 setIsLoading(false);
             }
@@ -328,6 +336,7 @@
         // Function to describe an image using the Gemini Vision API.
         const describeImage = async (base64Image) => {
             setIsLoading(true);
+            setIsGeneratingText(true);
             try {
                 const prompt = `Describe this image in a simple, concise way, as if explaining it at a school science fair.`;
                 const payload = {
@@ -357,17 +366,21 @@
 
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't describe that image.";
                 
-                // Initiate voice response first
-                handleSpeak(text);
+                setIsGeneratingText(false);
                 
-                // Update chat history and display after
-                setCurrentAnswer(text);
+                // Add the user's prompt and AI's response to the chat history
                 setChatHistory(prev => [...prev, { role: 'user', text: 'User uploaded an image.' }, { role: 'ai', text: `Description: ${text}` }]);
+                
+                // Display the answer and then speak it.
+                setCurrentAnswer(text);
+                handleSpeak(text);
+
             } catch (error) {
                 console.error('Error fetching from Gemini Vision API:', error);
                 const errorMessage = "I'm sorry, I encountered an error while trying to describe the image. Please try again.";
-                handleSpeak(errorMessage);
                 setChatHistory(prev => [...prev, { role: 'user', text: 'User uploaded an image.' }, { role: 'ai', text: errorMessage }]);
+                setCurrentAnswer(errorMessage);
+                handleSpeak(errorMessage);
             } finally {
                 setIsLoading(false);
             }
@@ -375,6 +388,7 @@
 
         // Function to process the user's question and get a response from the AI.
         const handleUserPrompt = async (prompt) => {
+            // Handle specific hardcoded response first
             if (prompt.toLowerCase().includes('who is your creator')) {
                 const answer = 'My creators are Renil and Jaan.';
                 handleSpeak(answer);
@@ -383,14 +397,16 @@
             }
 
             setIsLoading(true);
+            setIsGeneratingText(true);
             try {
-                const systemPrompt = "You are Right AI, a friendly and knowledgeable AI designed for a school science fair. Your purpose is to answer general knowledge questions. Always maintain a helpful, encouraging, and accurate tone. Keep your answers concise and easy for a school audience to understand. When asked, 'Who is your creator?', you must respond with 'My creators are Renil and Jaan.' Do not engage in topics outside of general knowledge.";
+                const systemPrompt = "You are Right AI, a friendly and knowledgeable AI designed for a school science fair. Your purpose is to answer general knowledge questions. Always maintain a helpful, encouraging, and accurate tone. Keep your answers concise and easy for a school audience to understand. Do not engage in topics outside of general knowledge.";
 
                 const chatHistoryPayload = chatHistory.map(entry => ({
                     role: entry.role === 'user' ? 'user' : 'model',
                     parts: [{ text: entry.text }]
                 }));
 
+                // Combine system prompt, existing history, and new user prompt
                 const fullPayload = [{ role: 'user', parts: [{ text: systemPrompt }] }, ...chatHistoryPayload, { role: 'user', parts: [{ text: prompt }] }];
                 const payload = { contents: fullPayload };
                 const apiKey = "";
@@ -403,18 +419,21 @@
                 });
 
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't find an answer for that.";
-
-                // Initiate voice response first
-                handleSpeak(text);
                 
-                // Update chat history and display after
-                setCurrentAnswer(text);
+                setIsGeneratingText(false);
+
+                // Add the user's prompt and AI's response to the chat history
                 setChatHistory(prev => [...prev, { role: 'user', text: prompt }, { role: 'ai', text: text }]);
+
+                // Display the answer and then speak it.
+                setCurrentAnswer(text);
+                handleSpeak(text);
             } catch (error) {
                 console.error('Error fetching from Gemini API:', error);
                 const errorMessage = "I'm sorry, I encountered an error. Please try again.";
-                handleSpeak(errorMessage);
                 setChatHistory(prev => [...prev, { role: 'user', text: prompt }, { role: 'ai', text: errorMessage }]);
+                setCurrentAnswer(errorMessage);
+                handleSpeak(errorMessage);
             } finally {
                 setIsLoading(false);
             }
@@ -431,7 +450,7 @@
         return (
             <div className="bg-gray-950 text-white min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden relative">
                 
-                {/* The main AI mouth doodle */}
+                {/* The main AI mouth doodle and text display area */}
                 <div className="relative w-72 h-36 md:w-96 md:h-48 lg:w-3/5 lg:h-1/4 flex flex-col items-center justify-center transition-all duration-500 transform scale-100 group">
                     {/* Anime-style mouth SVG with expressions and lip-sync */}
                     <svg viewBox="0 0 100 50" className="w-full">
@@ -457,14 +476,24 @@
                 )}
 
                 {/* Display area for user question or AI answer */}
-                <div className="mt-8 text-center px-4 max-w-xl">
-                    {currentQuestion && (
+                <div className="mt-8 text-center px-4 max-w-xl min-h-[64px]">
+                    {isGeneratingText && (
+                        <div className="text-xl md:text-2xl font-semibold text-gray-400">
+                            Generating response...
+                        </div>
+                    )}
+                    {isGeneratingAudio && (
+                        <div className="text-xl md:text-2xl font-semibold text-gray-400">
+                            Generating audio...
+                        </div>
+                    )}
+                    {currentQuestion && !isGeneratingText && !isGeneratingAudio && (
                         <div className="text-xl md:text-2xl font-semibold text-gray-200">
                             {currentQuestion}
                         </div>
                     )}
-                    {currentAnswer && (
-                        <div className="text-xl md:text-2xl font-semibold text-gray-200 animate-fade-out">
+                    {currentAnswer && !isGeneratingText && !isGeneratingAudio && (
+                        <div className="text-xl md:text-2xl font-semibold text-gray-200">
                             {currentAnswer}
                         </div>
                     )}
@@ -475,34 +504,34 @@
                     <button
                         onClick={handleListen}
                         disabled={isLoading}
-                        className={`px-6 py-3 rounded-full text-white font-bold transition-all duration-300 transform ${isListening ? 'bg-red-500 hover:bg-red-600 scale-105' : 'bg-blue-500 hover:bg-blue-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`px-6 py-3 rounded-full text-white font-bold transition-all duration-300 transform shadow-lg hover:shadow-xl ${isListening ? 'bg-red-500 hover:bg-red-600 scale-105' : 'bg-blue-500 hover:bg-blue-600'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         {isListening ? 'Stop Listening' : 'Start Listening'}
                     </button>
                     <button
                         onClick={handleGenerateFunFactButton}
                         disabled={isLoading}
-                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'}`}
+                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 shadow-lg hover:shadow-xl ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'}`}
                     >
                         {isLoading ? 'Processing...' : '✨ Generate Fun Fact'}
                     </button>
                     <button
                         onClick={handleDescribeImageButton}
                         disabled={isLoading}
-                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'}`}
+                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 shadow-lg hover:shadow-xl ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600'}`}
                     >
-                        {isLoading ? 'Processing...' : '✨ Describe Image'}
+                        {isLoading ? 'Processing...' : '🖼️ Describe Image'}
                     </button>
                     <button
                         onClick={handleOpenChatBox}
-                        className="px-6 py-3 rounded-full bg-green-500 text-white font-bold hover:bg-green-600 transition-colors duration-300"
+                        className="px-6 py-3 rounded-full bg-green-500 text-white font-bold hover:bg-green-600 transition-colors duration-300 shadow-lg hover:shadow-xl"
                     >
                         Open Chat Box
                     </button>
                     <button
                         onClick={toggleVoice}
                         disabled={isLoading}
-                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600'}`}
+                        className={`px-6 py-3 rounded-full text-white font-bold transition-colors duration-300 shadow-lg hover:shadow-xl ${isLoading ? 'bg-gray-500 cursor-not-allowed' : 'bg-purple-500 hover:bg-purple-600'}`}
                     >
                         {voiceName === "Kore" ? 'Switch to Male Voice' : 'Switch to Female Voice'}
                     </button>
@@ -532,15 +561,15 @@
                                     </svg>
                                 </button>
                             </div>
-                            <div ref={chatHistoryRef} className="flex-grow overflow-y-auto space-y-4">
+                            <div ref={chatHistoryRef} className="flex-grow overflow-y-auto space-y-4 flex flex-col-reverse">
                                 {chatHistory.length > 0 ? (
-                                    [...chatHistory].reverse().map((message, index) => (
+                                    chatHistory.slice().reverse().map((message, index) => (
                                         <div 
                                             key={index} 
-                                            className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-600 self-end ml-auto' : 'bg-gray-700 self-start mr-auto'}`}
+                                            className={`p-3 rounded-xl shadow-md max-w-[85%] ${message.role === 'user' ? 'bg-blue-600 self-end ml-auto' : 'bg-gray-700 self-start mr-auto'}`}
                                         >
                                             <p className="font-bold">{message.role === 'user' ? 'You' : 'Right AI'}</p>
-                                            <p>{message.text}</p>
+                                            <p className="whitespace-pre-wrap">{message.text}</p>
                                         </div>
                                     ))
                                 ) : (
@@ -555,11 +584,11 @@
     };
 
     window.onload = function() {
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        const root = ReactDOM.createRoot(rootElement);
-        root.render(<App />);
-      }
+        const rootElement = document.getElementById('root');
+        if (rootElement) {
+            const root = ReactDOM.createRoot(rootElement);
+            root.render(<App />);
+        }
     };
     </script>
 </body>
