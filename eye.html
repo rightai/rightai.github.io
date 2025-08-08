@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futuristic Anime Eyes with Expressions</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #0d0d1a;
+            color: #00ffff;
+            font-family: 'Orbitron', sans-serif;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h1 {
+            text-align: center;
+            text-shadow: 0 0 10px #00ffff;
+            margin-bottom: 50px;
+            letter-spacing: 2px;
+            font-weight: 700;
+            font-size: 2rem;
+            animation: pulse-text 2s infinite alternate;
+        }
+
+        .container {
+            display: flex;
+            gap: 80px;
+            perspective: 1000px;
+        }
+
+        .eye {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border: 2px solid #00ffff;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, #1a1a33 0%, #0d0d1a 100%);
+            box-shadow: 
+                0 0 15px #00ffff, 
+                inset 0 0 10px #00ffff,
+                0 0 25px rgba(0, 255, 255, 0.5);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: rotateY(0deg) rotateX(0deg);
+            transition: height 0.1s ease-in-out, border-radius 0.1s ease-in-out, box-shadow 3s ease-in-out;
+            animation: glow-pulse 3s infinite alternate;
+        }
+        
+        .eye.blink {
+            height: 5px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px #00ffff;
+        }
+
+        .eye.squint {
+            height: 120px;
+            border-radius: 40%;
+        }
+        
+        .pupil {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #00ffff 0%, #0d0d1a 70%);
+            border-radius: 50%;
+            box-shadow: 
+                0 0 10px #00ffff, 
+                inset 0 0 8px #00ffff;
+            transform: translate(-50%, -50%);
+            left: 50%;
+            top: 50%;
+            z-index: 2;
+            transition: width 0.3s, height 0.3s, transform 0.5s, opacity 0.1s;
+        }
+
+        .pupil::after {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: white;
+            border-radius: 50%;
+            top: 15%;
+            left: 15%;
+            filter: blur(1px);
+        }
+
+        .iris-ring {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: scale(0.9);
+            animation: rotate-ring 10s linear infinite;
+            transition: opacity 0.1s;
+        }
+
+        .iris-ring::before,
+        .iris-ring::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: rotate(45deg);
+        }
+
+        .iris-ring::after {
+            transform: rotate(-45deg);
+        }
+
+        @keyframes glow-pulse {
+            0% { box-shadow: 0 0 15px #00ffff, inset 0 0 10px #00ffff, 0 0 25px rgba(0, 255, 255, 0.5); }
+            100% { box-shadow: 0 0 25px #00ffff, inset 0 0 15px #00ffff, 0 0 40px rgba(0, 255, 255, 0.8); }
+        }
+
+        @keyframes rotate-ring {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse-text {
+            0% { text-shadow: 0 0 10px #00ffff; }
+            100% { text-shadow: 0 0 20px #00ffff, 0 0 30px rgba(0, 255, 255, 0.5); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>SCANNING...</h1>
+    
+    <div class="container">
+        <!-- Eye 1 -->
+        <div class="eye" id="eye1">
+            <div class="iris-ring"></div>
+            <div class="pupil" id="pupil1"></div>
+        </div>
+        
+        <!-- Eye 2 -->
+        <div class="eye" id="eye2">
+            <div class="iris-ring"></div>
+            <div class="pupil" id="pupil2"></div>
+        </div>
+    </div>
+
+    <script>
+        // Get references to the eyes, pupils, and iris rings
+        const eye1 = document.getElementById('eye1');
+        const pupil1 = document.getElementById('pupil1');
+        const eye2 = document.getElementById('eye2');
+        const pupil2 = document.getElementById('pupil2');
+        const pupils = [pupil1, pupil2];
+        const eyes = [eye1, eye2];
+
+        // Define the different expression states
+        const expressions = {
+            neutral: { width: '40px', height: '40px', transform: 'translate(-50%, -50%)' },
+            lookLeft: { width: '40px', height: '40px', transform: 'translate(-80%, -50%)' },
+            lookRight: { width: '40px', height: '40px', transform: 'translate(-20%, -50%)' },
+            lookUp: { width: '40px', height: '40px', transform: 'translate(-50%, -80%)' },
+            lookDown: { width: '40px', height: '40px', transform: 'translate(-50%, -20%)' },
+            surprised: { width: '55px', height: '55px', transform: 'translate(-50%, -50%)' }
+        };
+
+        // Function to set the expression for both pupils
+        function setPupilExpression(expression) {
+            pupils.forEach(pupil => {
+                pupil.style.width = expression.width;
+                pupil.style.height = expression.height;
+                pupil.style.transform = expression.transform;
+            });
+        }
+        
+        // Function to create a quick blink
+        async function blink() {
+            // Close the eyes
+            eyes.forEach(eye => {
+                eye.classList.add('blink');
+                eye.querySelector('.iris-ring').style.opacity = '0';
+            });
+            await new Promise(resolve => setTimeout(resolve, 150)); // Wait for 150ms
+            
+            // Open the eyes
+            eyes.forEach(eye => {
+                eye.classList.remove('blink');
+                eye.querySelector('.iris-ring').style.opacity = '1';
+            });
+            await new Promise(resolve => setTimeout(resolve, 200)); // Wait for 200ms
+        }
+
+        // Function to make the eyes squint
+        async function squint() {
+            eyes.forEach(eye => eye.classList.add('squint'));
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            eyes.forEach(eye => eye.classList.remove('squint'));
+        }
+
+        // Main animation loop to cycle through expressions
+        async function animateExpressions() {
+            // Main loop
+            while (true) {
+                // Wait for a random period
+                const neutralDelay = Math.random() * 2000 + 1000;
+                await new Promise(resolve => setTimeout(resolve, neutralDelay));
+                
+                // Decide on the next action
+                const randomAction = Math.random();
+                if (randomAction < 0.3) {
+                    await blink();
+                } else if (randomAction < 0.5) {
+                    setPupilExpression(expressions.lookLeft);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (randomAction < 0.7) {
+                    setPupilExpression(expressions.lookRight);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (randomAction < 0.8) {
+                    await squint();
+                }
+
+                // Return to neutral state
+                setPupilExpression(expressions.neutral);
+            }
+        }
+        
+        // Start the animation loop when the page loads
+        document.addEventListener('DOMContentLoaded', animateExpressions);
+    </script>
+
+</body>
+</html>
